@@ -53,6 +53,7 @@ let _instance: PolicyService | null = null;
 
 export function getPolicyService(): PolicyService {
   if (!_instance) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { PolicyRepository } = require('../repositories/policy.repository');
     const repo = new PolicyRepository(getDbPool());
     _instance = new PolicyService(repo);

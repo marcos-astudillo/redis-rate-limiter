@@ -81,7 +81,9 @@ let _instance: TokenBucketService | null = null;
 
 export function getTokenBucketService(): TokenBucketService {
   if (!_instance) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { getRedisClient } = require('../config/redis');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { env } = require('../config/env');
     const repo = new BucketRepository(getRedisClient());
     _instance = new TokenBucketService(repo, {

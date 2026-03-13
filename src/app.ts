@@ -1,4 +1,6 @@
 import express from 'express';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec }   from './config/swagger';
 import { rateLimitRoutes } from './routes/ratelimit.routes';
 import { policyRoutes }    from './routes/policy.routes';
 import { metricsRoutes }   from './routes/metrics.routes';
@@ -11,6 +13,25 @@ export function createApp(): express.Application {
   app.use(express.json());
   app.use(requestLogger);
 
+  // ── Swagger UI ─────────────────────────────────────────────────────────────
+  // Available at /api-docs in all environments (add auth guard in production)
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    customSiteTitle: 'Redis Rate Limiter API',
+    swaggerOptions: {
+      persistAuthorization: true,
+      displayRequestDuration: true,
+      docExpansion: 'list',
+      filter: true,
+    },
+  }));
+
+  // Expose the raw OpenAPI JSON (useful for code generation tools)
+  app.get('/api-docs.json', (_req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(swaggerSpec);
+  });
+
+  // ── API routes ─────────────────────────────────────────────────────────────
   // Health check — no rate limiting applied here
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
