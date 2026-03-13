@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { getPolicyService, PolicyNotFoundError, PolicyConflictError } from '../services/policy.service';
+import { invalidatePolicyCache } from '../middlewares/rateLimiterByPlan';
 
 export async function listPolicies(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -62,6 +63,7 @@ export async function updatePolicy(req: Request, res: Response, next: NextFuncti
     if (refill_per_sec !== undefined) dto.refillPerSec = refill_per_sec;
 
     const policy = await getPolicyService().updatePolicy(req.params.name, dto);
+    invalidatePolicyCache(req.params.name); // ensure next request picks up new limits
     res.json(policy);
   } catch (err) {
     if (err instanceof PolicyNotFoundError) { res.status(404).json({ error: err.message }); return; }
@@ -72,6 +74,7 @@ export async function updatePolicy(req: Request, res: Response, next: NextFuncti
 export async function deletePolicy(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     await getPolicyService().deletePolicy(req.params.name);
+    invalidatePolicyCache(req.params.name);
     res.status(204).send();
   } catch (err) {
     if (err instanceof PolicyNotFoundError) { res.status(404).json({ error: err.message }); return; }
