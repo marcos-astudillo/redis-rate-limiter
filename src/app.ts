@@ -13,38 +13,57 @@ export function createApp(): express.Application {
   app.use(express.json());
   app.use(requestLogger);
 
+  // ── Root endpoint ──────────────────────────────────────────────────────────
+  // Service metadata (useful for quick checks and API discovery)
+  app.get("/", (_req, res) => {
+    res.json({
+      service: "redis-rate-limiter",
+      status: "ok",
+      docs: "/api-docs",
+      health: "/health",
+      version: "1.0.0",
+      uptime_seconds: Math.floor(process.uptime()),
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+
   // ── Swagger UI ─────────────────────────────────────────────────────────────
   // Available at /api-docs in all environments (add auth guard in production)
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-    customSiteTitle: 'Redis Rate Limiter API',
-    swaggerOptions: {
-      persistAuthorization: true,
-      displayRequestDuration: true,
-      docExpansion: 'list',
-      filter: true,
-    },
-  }));
+  app.use(
+    "/api-docs",
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec, {
+      customSiteTitle: "Redis Rate Limiter API",
+      swaggerOptions: {
+        persistAuthorization: true,
+        displayRequestDuration: true,
+        docExpansion: "list",
+        filter: true,
+      },
+    }),
+  );
 
   // Expose the raw OpenAPI JSON (useful for code generation tools)
-  app.get('/api-docs.json', (_req, res) => {
-    res.setHeader('Content-Type', 'application/json');
+  app.get("/api-docs.json", (_req, res) => {
+    res.setHeader("Content-Type", "application/json");
     res.send(swaggerSpec);
   });
 
   // ── API routes ─────────────────────────────────────────────────────────────
   // Health check — no rate limiting applied here
-  app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  app.get("/health", (_req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
   // Core rate-limit check API (used as a standalone microservice)
-  app.use('/v1/ratelimit', rateLimitRoutes);
+  app.use("/v1/ratelimit", rateLimitRoutes);
 
   // Plan policy CRUD (admin — add auth middleware in production)
-  app.use('/v1/policies', policyRoutes);
+  app.use("/v1/policies", policyRoutes);
 
   // Internal metrics
-  app.use('/v1/metrics', metricsRoutes);
+  app.use("/v1/metrics", metricsRoutes);
 
   // Global error handler — must be registered last
   app.use(errorHandler);
