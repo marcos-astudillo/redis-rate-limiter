@@ -1,22 +1,22 @@
 /**
- * LocalCache — in-memory TTL store.
+ * LocalCache<T> — generic in-memory TTL store.
  *
- * Used as a short-circuit for keys that are clearly under their limit,
- * reducing Redis round-trips by the configured TTL window (default 500ms).
+ * Used as a short-circuit for keys clearly under their limit (default: number)
+ * and for policy lookups (RateLimitPolicy), reducing Redis/DB round-trips.
  * Only "definitely allowed" results are cached; denials always hit Redis.
  */
 
-interface CacheEntry {
-  value: number;
+interface CacheEntry<T> {
+  value: T;
   expiresAt: number;
 }
 
-export class LocalCache {
-  private readonly store = new Map<string, CacheEntry>();
+export class LocalCache<T = number> {
+  private readonly store = new Map<string, CacheEntry<T>>();
 
   constructor(private readonly ttlMs: number) {}
 
-  get(key: string): number | undefined {
+  get(key: string): T | undefined {
     const entry = this.store.get(key);
     if (!entry) return undefined;
     if (Date.now() > entry.expiresAt) {
@@ -26,7 +26,7 @@ export class LocalCache {
     return entry.value;
   }
 
-  set(key: string, value: number): void {
+  set(key: string, value: T): void {
     this.store.set(key, { value, expiresAt: Date.now() + this.ttlMs });
   }
 
@@ -38,7 +38,7 @@ export class LocalCache {
     return this.store.size;
   }
 
-  /** Purge all expired entries — call periodically to prevent memory leak */
+  /** Remove all expired entries. Call periodically to prevent memory growth. */
   evictExpired(): void {
     const now = Date.now();
     for (const [key, entry] of this.store.entries()) {

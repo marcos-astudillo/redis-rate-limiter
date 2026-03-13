@@ -2,9 +2,11 @@ import { BucketRepository } from '../repositories/bucket.repository';
 import { RateLimitOptions, RateLimitResult, RateLimiterConfig } from '../models/rateLimit.types';
 import { LocalCache } from './localCache';
 import { logger } from '../config/logger';
+import { incrementRedisErrors } from './metrics.service';
 
 export class TokenBucketService {
   private readonly cache: LocalCache | null;
+  private evictionInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private readonly repo: BucketRepository,
@@ -13,6 +15,13 @@ export class TokenBucketService {
     this.cache = config.localCacheEnabled
       ? new LocalCache(config.localCacheTtlMs)
       : null;
+
+    if (this.cache) {
+      // Evict expired entries every 60s to prevent unbounded memory growth.
+      // unref() so this timer doesn't keep the Node process alive on shutdown.
+      this.evictionInterval = setInterval(() => this.cache?.evictExpired(), 60_000);
+      this.evictionInterval.unref();
+    }
   }
 
   async checkLimit(options: RateLimitOptions): Promise<RateLimitResult> {
@@ -30,13 +39,14 @@ export class TokenBucketService {
       const result = await this.repo.checkAndConsume(options);
 
       // Populate cache only when remaining is well above zero (>20% of capacity)
-      // to avoid serving cached "allowed" responses when approaching the limit.
+      // to avoid serving cached "allowed" when approaching the limit.
       if (this.cache && result.allowed && result.remaining > options.capacity * 0.2) {
         this.cache.set(options.key, result.remaining);
       }
 
       return result;
     } catch (err: unknown) {
+      incrementRedisErrors(); // track Redis health degradation in metrics
       const msg = err instanceof Error ? err.message : String(err);
       logger.error('TokenBucketService', 'Redis error — applying fail policy', {
         key: options.key,
@@ -44,6 +54,14 @@ export class TokenBucketService {
         error: msg,
       });
       return this.applyFailPolicy();
+    }
+  }
+
+  /** Release the eviction timer — call on graceful shutdown if needed. */
+  destroy(): void {
+    if (this.evictionInterval) {
+      clearInterval(this.evictionInterval);
+      this.evictionInterval = null;
     }
   }
 
@@ -58,22 +76,20 @@ export class TokenBucketService {
 }
 
 // ─── Module-level singleton ───────────────────────────────────────────────────
-// Lazily initialized so Redis and env are available at call time, not import time.
 
 let _instance: TokenBucketService | null = null;
 
 export function getTokenBucketService(): TokenBucketService {
   if (!_instance) {
-    // Deferred imports to avoid circular dependency and to allow env to load first
     const { getRedisClient } = require('../config/redis');
     const { env } = require('../config/env');
     const repo = new BucketRepository(getRedisClient());
     _instance = new TokenBucketService(repo, {
-      capacity: env.rateLimit.capacity,
-      refillPerSec: env.rateLimit.refillPerSec,
-      failPolicy: env.rateLimit.failPolicy,
+      capacity:          env.rateLimit.capacity,
+      refillPerSec:      env.rateLimit.refillPerSec,
+      failPolicy:        env.rateLimit.failPolicy,
       localCacheEnabled: env.rateLimit.localCacheEnabled,
-      localCacheTtlMs: env.rateLimit.localCacheTtlMs,
+      localCacheTtlMs:   env.rateLimit.localCacheTtlMs,
     });
   }
   return _instance;
@@ -81,5 +97,6 @@ export function getTokenBucketService(): TokenBucketService {
 
 /** Reset singleton — for use in tests only */
 export function _resetTokenBucketService(): void {
+  _instance?.destroy();
   _instance = null;
 }

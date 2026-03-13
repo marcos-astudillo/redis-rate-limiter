@@ -42,8 +42,23 @@ export async function createPolicy(req: Request, res: Response, next: NextFuncti
 export async function updatePolicy(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { capacity, refill_per_sec } = req.body as Record<string, unknown>;
+
+    if (capacity === undefined && refill_per_sec === undefined) {
+      res.status(400).json({ error: 'At least one field (capacity, refill_per_sec) must be provided' });
+      return;
+    }
+
+    const errors: string[] = [];
+    if (capacity !== undefined && (typeof capacity !== 'number' || capacity <= 0)) {
+      errors.push('capacity must be a positive number');
+    }
+    if (refill_per_sec !== undefined && (typeof refill_per_sec !== 'number' || refill_per_sec <= 0)) {
+      errors.push('refill_per_sec must be a positive number');
+    }
+    if (errors.length > 0) { res.status(400).json({ error: 'Validation failed', details: errors }); return; }
+
     const dto: Record<string, unknown> = {};
-    if (capacity !== undefined)     dto.capacity     = capacity;
+    if (capacity !== undefined)       dto.capacity     = capacity;
     if (refill_per_sec !== undefined) dto.refillPerSec = refill_per_sec;
 
     const policy = await getPolicyService().updatePolicy(req.params.name, dto);
