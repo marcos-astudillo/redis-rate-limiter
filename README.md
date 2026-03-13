@@ -81,28 +81,29 @@ Fail-closed protects backend resources but may reject valid traffic.
 Client
   |
   v
-API Gateway / Edge
+API Gateway / Application
   |
   v
-Express App
-  +-- POST /v1/ratelimit/check       <- standalone microservice endpoint
-  +-- CRUD /v1/policies              <- plan management (free/pro/enterprise)
-  +-- GET  /v1/metrics               <- counters + Redis health
-  +-- GET  /api-docs                 <- Swagger UI (OpenAPI 3.0)
-  |
-  +-- rateLimiter()         <- static limits, hardcoded per route
-  +-- rateLimiterByPlan()   <- dynamic limits from PostgreSQL
-  |     +-- policyCache (LocalCache<Policy>, 60s TTL)
-  |
-  +-- TokenBucketService
-  |     +-- LocalCache<number> (optional, evicted every 60s)
-  |     +-- BucketRepository
-  |           +-- Redis Lua Script (EVALSHA, NOSCRIPT guard)
-  |                 +-- Redis ---------> bucket:<key> { tokens, last_refill_ms }
-  |
-  +-- PolicyRepository
-        +-- PostgreSQL ----------------> rate_limit_policies { name, capacity, refill_per_sec }
+Redis Rate Limiter (Express Service)
+|
++-- TokenBucketService
+| |
+| +-- Redis (Token Bucket state via Lua script)
+|
++-- PolicyRepository
+|
++-- PostgreSQL (rate limit policies)
 ```
+
+For detailed diagrams and system design documentation see:
+
+- [System Architecture](docs/architecture.md)
+- [Request Flow Diagrams](docs/request-flow.md)
+
+These diagrams illustrate the internal components of the rate limiter,
+including middleware flow, Redis interactions, and policy resolution.
+
+---
 
 ### Token Bucket Lua script (atomic)
 
