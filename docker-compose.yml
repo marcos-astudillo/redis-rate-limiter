@@ -17,6 +17,24 @@ services:
       retries: 5
     restart: unless-stopped
 
+  postgres:
+    image: postgres:15-alpine
+    container_name: rate-limiter-postgres
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-rate_limiter}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER:-postgres}']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
   app:
     build:
       context: .
@@ -24,16 +42,21 @@ services:
     container_name: rate-limiter-app
     ports:
       - '${PORT:-3000}:3000'
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-    env_file:
-      - .env
+      - DB_HOST=postgres
+      - DB_PORT=5432
     depends_on:
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     restart: unless-stopped
 
 volumes:
   redis_data:
+  postgres_data:
