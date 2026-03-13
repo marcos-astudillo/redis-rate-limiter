@@ -55,6 +55,15 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Run database migration
+        run: npm run migrate
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: rate_limiter_test
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+
       - name: Run tests
         run: npm test
         env:
