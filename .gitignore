@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.env
+*.local
+
+# Logs
+logs/
+*.log
+
+# Jest
+coverage/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
