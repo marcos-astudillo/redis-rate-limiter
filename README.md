@@ -125,6 +125,7 @@ Interactive Swagger UI is served at `/api-docs` when the service is running.
 
 ## Local Development
 ```
+http://localhost:3000/                <- Root endpoint with service info
 http://localhost:3000/api-docs        <- Swagger UI (try it live)
 http://localhost:3000/api-docs.json   <- Raw OpenAPI 3.0 JSON spec
 ```
@@ -132,6 +133,7 @@ http://localhost:3000/api-docs.json   <- Raw OpenAPI 3.0 JSON spec
 
 ## Live Demo
 ```
+Root endpoint: https://redis-rate-limiter-production.up.railway.app/
 Swagger UI: https://redis-rate-limiter-production.up.railway.app/api-docs/
 Health check: https://redis-rate-limiter-production.up.railway.app/health
 ```

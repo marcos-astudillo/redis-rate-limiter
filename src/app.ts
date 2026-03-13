@@ -18,6 +18,7 @@ export function createApp(): express.Application {
   app.get("/", (_req, res) => {
     res.json({
       service: "redis-rate-limiter",
+      env: process.env.NODE_ENV,
       status: "ok",
       docs: "/api-docs",
       health: "/health",
