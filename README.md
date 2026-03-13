@@ -1,15 +1,23 @@
 # Redis Rate Limiter
 
-[![CI](https://github.com/marcos-astudillo/redis-rate-limiter/actions/workflows/ci.yml/badge.svg)](https://github.com/marcos-astudillo/redis-rate-limiter/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Node.js](https://img.shields.io/badge/Node.js-20-green.svg)](https://nodejs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue.svg)](https://www.typescriptlang.org)
+![CI](https://github.com/marcos-astudillo/redis-rate-limiter/actions/workflows/ci.yml/badge.svg)
+![Node.js](https://img.shields.io/badge/node.js-20-green)
+![TypeScript](https://img.shields.io/badge/typescript-5-blue)
+![Express](https://img.shields.io/badge/framework-express-lightgrey)
+![Redis](https://img.shields.io/badge/cache-redis-red)
+![PostgreSQL](https://img.shields.io/badge/database-postgresql-blue)
+![Docker](https://img.shields.io/badge/docker-containerized-blue)
+![OpenAPI](https://img.shields.io/badge/openapi-3.0-green)
+![Rate Limiting](https://img.shields.io/badge/algorithm-token--bucket-orange)
+![Redis Lua](https://img.shields.io/badge/redis-lua--script-critical)
+![Tests](https://img.shields.io/badge/tests-jest-yellow)
+![License](https://img.shields.io/github/license/marcos-astudillo/redis-rate-limiter)
 
 A production-grade **distributed rate limiter** built with Node.js, TypeScript, Redis, and PostgreSQL.
 
 Implements the **Token Bucket** algorithm with **atomic Redis Lua scripts** — no race conditions under concurrent load. Supports plan-based limiting backed by PostgreSQL, optional in-memory fast-path cache, and pluggable key extraction strategies.
 
-> System design reference: [rate-limiter.md](https://github.com/marcos-astudillo/system-design-notes/blob/main/designs/rate-limiter.md)
+> System design reference: [rate-limiter.md](https://github.com/marcos-astudillo/system-design-notes/blob/master/designs/rate-limiter.md)
 
 ---
 
@@ -25,6 +33,45 @@ Implements the **Token Bucket** algorithm with **atomic Redis Lua scripts** — 
 - **Standard rate limit headers** — `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Policy`, `Retry-After`
 - **Interactive API docs** — Swagger UI at `/api-docs`, raw OpenAPI JSON at `/api-docs.json`
 - **Dual interface** — use as Express middleware or standalone HTTP microservice
+
+---
+
+## Why Token Bucket?
+
+This service uses the Token Bucket algorithm because it:
+
+• Allows burst traffic up to bucket capacity  
+• Smooths traffic over time using refill rate  
+• Works well with distributed systems using Redis  
+• Requires only one atomic operation per request
+
+---
+
+## Use Cases
+
+Typical scenarios:
+
+• API gateways enforcing per-API key limits
+• SaaS products limiting tenant usage
+• Protecting expensive endpoints (search, AI calls)
+• Preventing abuse from IP-based clients
+
+---
+
+## Design Trade-offs
+
+### Redis as state store
+Pros:
+- Atomic operations with Lua
+- Very low latency
+
+Cons:
+- External dependency
+- Hot key risk
+
+### Fail-open vs Fail-closed
+Fail-open improves availability but risks temporary abuse.
+Fail-closed protects backend resources but may reject valid traffic.
 
 ---
 
@@ -79,6 +126,16 @@ Interactive Swagger UI is served at `/api-docs` when the service is running.
 http://localhost:3000/api-docs        <- Swagger UI (try it live)
 http://localhost:3000/api-docs.json   <- Raw OpenAPI 3.0 JSON spec
 ```
+
+---
+
+## API Preview
+
+Swagger UI for testing the rate limiter endpoints.
+
+<p align="center">
+  <img src="docs/images/swagger-ui.png" alt="Swagger UI" width="900"/>
+</p>
 
 ---
 
@@ -199,6 +256,84 @@ router.get('/search',
 ```
 
 **Extra response header added:** `X-RateLimit-Plan: pro`
+
+---
+
+
+---
+
+## Deployment Modes
+
+This service can run in two different ways depending on your architecture.
+
+### A) Standalone Microservice
+
+Deploy the rate limiter as an independent service. Any application can query it via HTTP.
+
+Example:
+
+```bash
+curl -X POST http://rate-limiter:3000/v1/ratelimit/check   -H "Content-Type: application/json"   -d '{"key":"user:123","capacity":100,"refill_per_sec":10}'
+```
+
+Flow:
+
+Client App (Node / Python / Go)
+        |
+        | HTTP
+        v
+Rate Limiter Service
+POST /v1/ratelimit/check
+        |
+        v
+      Redis
+
+Use this mode when:
+- multiple services share the same rate limits
+- services use different languages
+- you want to scale the limiter independently
+
+### B) Embedded Middleware
+
+Import the limiter directly into your Express application.
+
+```typescript
+import { rateLimiter } from './middlewares/rateLimiter'
+
+router.post(
+  '/orders',
+  rateLimiter({ capacity: 50, refillPerSec: 5 }),
+  handler
+)
+```
+
+Flow:
+
+Client
+  |
+Express App
+  |
+Rate Limiter Middleware
+  |
+Redis
+
+Use this mode when:
+- the limiter runs inside the same service
+- you want minimal latency
+- you don't need a separate infrastructure component
+
+### Shared State
+
+In both modes, **all counters live in Redis**, so multiple instances share the same rate limits:
+
+App Instance A
+App Instance B
+App Instance C
+        |
+        v
+      Redis
+
+This is what makes the system **distributed**.
 
 ---
 
@@ -401,6 +536,46 @@ GitHub Actions on every push and PR to `main`:
 
 ---
 
+## Interview Talking Points
+
+This project demonstrates:
+
+• Distributed rate limiting using Redis
+• Atomic concurrency control with Lua scripts
+• Middleware-based enforcement
+• Dynamic policy management with PostgreSQL
+• Observability via metrics endpoint
+• Fail-open vs fail-closed resilience strategies
+• Local caching optimization to reduce Redis load
+
+---
+
 ## License
 
-[MIT](./LICENSE) © 2026 Marcos Astudillo
+This project is licensed under the MIT License.
+
+See the [LICENSE](LICENSE) file for details.
+
+---
+
+## 📫 Connect With Me
+
+<p align="center">
+
+  <a href="https://www.marcosastudillo.com">
+    <img src="https://img.shields.io/badge/Website-marcosastudillo.com-blueviolet?style=for-the-badge&logo=google-chrome" />
+  </a>
+
+  <a href="https://www.linkedin.com/in/marcos-astudillo-c/">
+    <img src="https://img.shields.io/badge/LinkedIn-Marcos%20Astudillo-blue?style=for-the-badge&logo=linkedin" />
+  </a>
+
+  <a href="https://github.com/marcos-astudillo">
+    <img src="https://img.shields.io/badge/GitHub-Marcos%20Astudillo-181717?style=for-the-badge&logo=github&logoColor=white" />
+  </a>
+
+  <a href="mailto:m.astudillo1986@gmail.com">
+    <img src="https://img.shields.io/badge/Email-m.astudillo1986%40gmail.com-red?style=for-the-badge&logo=gmail" />
+  </a>
+
+</p>
